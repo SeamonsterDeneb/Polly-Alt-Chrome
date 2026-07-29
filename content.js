@@ -19,7 +19,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.action === "show_generating_modal") {
         buildModal(request.srcUrl);
     } else if (request.action === "populate_modal") {
-        populateModal(request.choices, request.srcUrl, request.showExplanation, request.analysis, request.currentAlt);
+        populateModal(request.choices, request.srcUrl, request.showExplanation, request.analysis, request.currentAlt, request.contextSummary);
     } else if (request.action === "show_error") {
         showError(request.message, request.srcUrl, request.currentAlt);
     }
@@ -62,6 +62,121 @@ function getFilenameFromUrl(url) {
 // -------------------------------------------------------------------------
 // Persistent Draggable Panel
 // -------------------------------------------------------------------------
+
+// Scrapes functional role and climbs parent wrappers to find preceding & following paragraph text
+function extractImageContext(imgSrc) {
+    console.log("🦜 POLLY SCRAPER: Searching DOM for image source:", imgSrc);
+
+    const context = {
+        isFunctional: false,
+        functionalRole: '',
+        destination: '',
+        paragraphsBefore: '',
+        paragraphsAfter: ''
+    };
+
+    // 1. Locate matching <img> in DOM (with URL & filename fallback matching)
+    const allImgs = Array.from(document.querySelectorAll('img'));
+    let imgEl = allImgs.find(i => i.src === imgSrc || i.currentSrc === imgSrc);
+
+    if (!imgEl && imgSrc) {
+        const cleanTarget = imgSrc.split('?')[0].split('#')[0];
+        imgEl = allImgs.find(i => {
+            const s = (i.src || i.currentSrc || '').split('?')[0].split('#')[0];
+            return s && (s === cleanTarget || s.endsWith(cleanTarget) || cleanTarget.endsWith(s));
+        });
+    }
+
+    if (!imgEl) {
+        console.warn("🦜 POLLY SCRAPER: ❌ Could not match <img> tag in DOM for:", imgSrc);
+        return context;
+    }
+
+    console.log("🦜 POLLY SCRAPER: ✅ Found <img> element:", imgEl);
+
+    // 2. Check Functional Roles (Link or Button wrapper)
+    const linkParent = imgEl.closest('a');
+    const buttonParent = imgEl.closest('button, [role="button"], input[type="image"]');
+
+    if (linkParent) {
+        context.isFunctional = true;
+        context.functionalRole = 'link';
+        context.destination = linkParent.getAttribute('href') || linkParent.getAttribute('aria-label') || '';
+        console.log("🦜 POLLY SCRAPER: Image is a Link -> Destination:", context.destination);
+        return context;
+    } else if (buttonParent) {
+        context.isFunctional = true;
+        context.functionalRole = 'button';
+        context.destination = buttonParent.getAttribute('aria-label') || buttonParent.getAttribute('title') || buttonParent.innerText.trim() || 'Trigger action';
+        console.log("🦜 POLLY SCRAPER: Image is a Button -> Action:", context.destination);
+        return context;
+    }
+
+    // Helper: Extracts paragraph text from an element or its child <p> tags
+    function extractTextFromElement(el) {
+        if (!el || el.nodeType !== 1) return [];
+        if (el.closest('#polly-audit-panel, #polly-alt-modal-overlay, script, style, nav, header, footer')) return [];
+
+        if (el.tagName === 'P') {
+            const txt = el.innerText ? el.innerText.trim() : '';
+            return txt.length > 20 ? [txt] : [];
+        }
+
+        // If it's a wrapper container (figure, div, section), check for internal <p> elements
+        const childPs = Array.from(el.querySelectorAll('p, blockquote, li'))
+            .map(p => p.innerText ? p.innerText.trim() : '')
+            .filter(txt => txt.length > 20);
+
+        if (childPs.length > 0) return childPs;
+
+        const fallback = el.innerText ? el.innerText.trim() : '';
+        return (fallback.length > 20 && fallback.length < 1500) ? [fallback] : [];
+    }
+
+    // 3. Walk UP and BACKWARDS to find PRECEDING paragraphs
+    let beforeTexts = [];
+    let curr = imgEl;
+
+    while (curr && curr !== document.body && beforeTexts.length < 2) {
+        if (curr.previousElementSibling) {
+            curr = curr.previousElementSibling;
+            const extracted = extractTextFromElement(curr);
+            extracted.forEach(txt => {
+                if (!beforeTexts.includes(txt)) {
+                    beforeTexts.unshift(txt); // Keep reading order
+                }
+            });
+        } else {
+            curr = curr.parentElement; // Step up wrapper container
+        }
+    }
+
+    // 4. Walk UP and FORWARDS to find FOLLOWING paragraphs
+    let afterTexts = [];
+    curr = imgEl;
+
+    while (curr && curr !== document.body && afterTexts.length < 1) {
+        if (curr.nextElementSibling) {
+            curr = curr.nextElementSibling;
+            const extracted = extractTextFromElement(curr);
+            extracted.forEach(txt => {
+                if (!afterTexts.includes(txt)) {
+                    afterTexts.push(txt);
+                }
+            });
+        } else {
+            curr = curr.parentElement; // Step up wrapper container
+        }
+    }
+
+    context.paragraphsBefore = beforeTexts.slice(-2).join('\n\n');
+    context.paragraphsAfter = afterTexts.slice(0, 1).join('\n\n');
+
+    console.log("🦜 POLLY SCRAPED PRECEDING PARAGRAPHS:\n", context.paragraphsBefore || "(None found)");
+    console.log("🦜 POLLY SCRAPED FOLLOWING PARAGRAPHS:\n", context.paragraphsAfter || "(None found)");
+
+    return context;
+}
 function togglePollyPanel() {
     if (pollyPanel) {
         pollyPanel.style.display = (pollyPanel.style.display === 'none') ? 'flex' : 'none';
@@ -75,8 +190,13 @@ function togglePollyPanel() {
         <div id="polly-panel-header">
             <span class="polly-panel-title">🦜 Polly Alt Assistant</span>
             <div class="polly-panel-header-actions">
-                <button type="button" id="polly-panel-settings-btn" title="Settings">⚙️</button>
-                <button type="button" id="polly-panel-close-btn" title="Close Panel">&times;</button>
+                <button type="button" id="polly-panel-settings-btn" aria-label="Settings">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </button>
+                <button type="button" id="polly-panel-close-btn" aria-label="Close Panel">&times;</button>
             </div>
         </div>
         <div id="polly-panel-controls">
@@ -92,7 +212,7 @@ function togglePollyPanel() {
 
     // Control button handlers
     document.getElementById('polly-panel-close-btn').onclick = () => pollyPanel.style.display = 'none';
-    document.getElementById('polly-panel-settings-btn').onclick = () => chrome.runtime.openOptionsPage();
+    document.getElementById('polly-panel-settings-btn').onclick = () => chrome.runtime.sendMessage({ action: "open_options" });
     document.getElementById('polly-clear-queue-btn').onclick = clearQueue;
     document.getElementById('polly-export-btn').onclick = exportQueue;
     document.getElementById('polly-add-checked-btn').onclick = addCheckedToQueue;
@@ -180,11 +300,14 @@ function refreshImageScanner() {
             const currentAltText = row.querySelector('.polly-row-alt-display').innerText.trim();
             const cleanAlt = (currentAltText === 'No alt text set') ? '' : currentAltText;
             
+            const imageContext = extractImageContext(src);
+
             buildModal(src);
             chrome.runtime.sendMessage({ 
                 action: "retry_generation", 
                 srcUrl: src,
-                currentAlt: cleanAlt
+                currentAlt: cleanAlt,
+                pageContext: imageContext
             });
         };
 
@@ -342,11 +465,19 @@ function showError(message, srcUrl, currentAlt = '') {
     document.getElementById('polly-error-close-btn').onclick = dismissModal;
 }
 
-function populateModal(choices, srcUrl, showExplanation, analysis = '', currentAlt = '') {
+function populateModal(choices, srcUrl, showExplanation, analysis = '', currentAlt = '', contextSummary = '') {
     clearInterval(tipInterval);
     document.getElementById('polly-modal-title').textContent = '🦜 Choose Alt Text';
     const body = document.getElementById('polly-modal-body');
     body.innerHTML = '';
+
+    // --- CONTEXT SUMMARY BADGE ---
+    if (contextSummary) {
+        const contextBadge = document.createElement('div');
+        contextBadge.className = 'polly-context-badge';
+        contextBadge.innerHTML = `🧭 <strong>Context Detected:</strong> ${escapeHtml(contextSummary)}`;
+        body.appendChild(contextBadge);
+    }
 
     // --- Helper function to attach inline edit functionality to any choice card ---
     function makeCardEditable(item, getInitialText, onTextUpdate) {

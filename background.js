@@ -7,7 +7,7 @@ chrome.runtime.onInstalled.addListener(() => {
     });
 });
 
-async function processImageGeneration(srcUrl, tabId, currentAlt = '') {
+async function processImageGeneration(srcUrl, tabId, currentAlt = '', pageContext = null) {
     try {
         const settings = await chrome.storage.sync.get(['pollyApiKey', 'pollyModel', 'pollyChoices', 'pollyExplain']);
         
@@ -23,8 +23,39 @@ async function processImageGeneration(srcUrl, tabId, currentAlt = '') {
 
         const model = settings.pollyModel || 'gemini-1.5-flash';
         const choiceCount = settings.pollyChoices || 3;
-        
-        // Fetch the image and convert to Base64
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.pollyApiKey}`;
+
+        let analyzedConcept = '';
+
+        // -----------------------------------------------------------------
+        // PASS 1: Pure Text Analysis (NO Image Data Sent)
+        // -----------------------------------------------------------------
+        if (pageContext && !pageContext.isFunctional && (pageContext.paragraphsBefore || pageContext.paragraphsAfter)) {
+            const pass1Prompt = `You are an accessibility expert analyzing text surrounding an image in an article.\n\n` +
+                `PRECEDING PARAGRAPHS:\n"${pageContext.paragraphsBefore}"\n\n` +
+                `FOLLOWING PARAGRAPHS:\n"${pageContext.paragraphsAfter}"\n\n` +
+                `TASK:\nIn 1 concise sentence, state what core concept, topic, or metaphor the author is discussing in this text. ` +
+                `DO NOT try to guess what the image shows. Focus ONLY on the narrative topic of the words (e.g., "The author is discussing how personalized recommendations make customers feel delighted/jubilant rather than frustrated.").`;
+
+            try {
+                const pass1Response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: pass1Prompt }] }] })
+                });
+                const pass1Data = await pass1Response.json();
+                if (pass1Response.ok && pass1Data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    analyzedConcept = pass1Data.candidates[0].content.parts[0].text.trim();
+                    console.log("🦜 POLLY PASS 1 RESULT (TEXT ONLY):", analyzedConcept);
+                }
+            } catch (e) {
+                console.warn("Polly Pass 1 Analysis Skipped:", e);
+            }
+        }
+
+        // -----------------------------------------------------------------
+        // PASS 2: Vision Alt Generation Grounded in Pass 1 Concept
+        // -----------------------------------------------------------------
         const imgResponse = await fetch(srcUrl);
         const imgBlob = await imgResponse.blob();
         const mimeType = imgBlob.type || 'image/jpeg';
@@ -36,20 +67,37 @@ async function processImageGeneration(srcUrl, tabId, currentAlt = '') {
             reader.readAsDataURL(imgBlob);
         });
 
+        let contextInstructions = '';
+
+        if (pageContext?.isFunctional) {
+            contextInstructions = `FUNCTIONAL ROLE:\n` +
+                `This image acts as an interactive ${pageContext.functionalRole.toUpperCase()} (Target: "${pageContext.destination}").\n` +
+                `- State ONLY the concise brand/organization name or action (e.g., "SeaMonster Studios Home").\n` +
+                `- NEVER write phrases like "acting as a link", "redirects to", "button icon", etc.\n` +
+                `- DO NOT describe visual emblem shapes unless strictly necessary for the action.\n\n`;
+        } else if (analyzedConcept) {
+            contextInstructions = `STRICT EDITORIAL THEME (FROM SURROUNDING TEXT):\n` +
+                `"${analyzedConcept}"\n\n` +
+                `THE "SHOW, DON'T TELL" ACCESSIBILITY MANDATE:\n` +
+                `1. SHOW (Use Context for Visual Emphasis): The surrounding text is about "${analyzedConcept}". Use this theme to decide WHICH visible details, facial expressions, or actions in the image to highlight (e.g., emphasize visible feelings of joy, delight, or excitement).\n` +
+                `2. DON'T TELL (Zero Editorializing): Describe ONLY physical visual realities. NEVER preach the article's business thesis or abstract lesson inside the alt text.\n` +
+                `3. ABSOLUTE PROHIBITION ON META-PHRASES: NEVER use words like "illustrating...", "representing...", "symbolizing...", "showing how...", "a metaphor for...", or "demonstrating...". The alt text must remain a pure, vivid description of what is seen.\n\n`;
+        }
+
         const prompt = `You are an accessibility expert writing alt text for a web image.\n` +
             `The current alt text on the page for this image is: "${currentAlt || 'None set'}".\n\n` +
+            `${contextInstructions}` +
             `TASKS:\n` +
-            `1. Provide a brief 1-2 sentence critique of the current alt text against web accessibility standards (snappy, under 125 chars, active voice, visual facts only, no "image of"). Phrase it like: "The current alt [evaluation]. It might be stronger if [recommendations]."\n` +
-            `2. Generate exactly ${choiceCount} distinct alt text variations following accessibility rules:\n` +
+            `1. Provide a 1-2 sentence critique of the current alt text against accessibility standards.\n` +
+            `2. Generate exactly ${choiceCount} distinct alt text variations following rules:\n` +
             `- Each alt text should be as close to 125 characters as possible without going over\n` +
             `- Do NOT begin with "image of", "photo of", "picture of", or similar\n` +
             `- Write in plain language, present tense, active voice\n` +
-            `- Include only what is visible — no interpretation or assumptions\n` +
-            `- Do NOT use double quotes (") inside the property values\n\n` +
+            `- Do NOT use double quotes (") inside property values\n\n` +
             `Return ONLY a valid JSON object with these exact keys:\n` +
-            `- "current_analysis": "your 1-2 sentence evaluation string of the current alt text",\n` +
+            `- "current_analysis": "1-2 sentence evaluation string of current alt text",\n` +
             `- "choices": a JSON array of objects, each containing "alt" and "explanation"\n\n` +
-            `Do not include any markdown formatting outside the JSON object.`;
+            `Do not include markdown formatting outside the JSON object.`;
 
         const payload = {
             contents: [{
@@ -61,8 +109,6 @@ async function processImageGeneration(srcUrl, tabId, currentAlt = '') {
             generationConfig: { responseMimeType: 'application/json' }
         };
 
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.pollyApiKey}`;
-        
         const aiResponse = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -93,8 +139,14 @@ async function processImageGeneration(srcUrl, tabId, currentAlt = '') {
             throw new Error("Blimey, the AI sent back a scrambled message! Please click 'Try Again'.");
         }
 
+        // Always display Pass 1's true text concept in the modal badge
+        const finalContextDisplay = pageContext?.isFunctional 
+            ? `Functional ${pageContext.functionalRole} pointing to ${pageContext.destination}`
+            : (analyzedConcept || 'No surrounding paragraph context found');
+
         chrome.tabs.sendMessage(tabId, { 
             action: "populate_modal", 
+            contextSummary: finalContextDisplay,
             analysis: parsedResult.current_analysis || '',
             choices: parsedResult.choices || [],
             srcUrl: srcUrl,
@@ -123,10 +175,15 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     }
 });
 
-// Listener for 'Make it Fit' compression and 'Try Again' retries
+// Listener for 'Make it Fit' compression, 'Try Again' retries, and Options Page navigation
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "open_options") {
+        chrome.runtime.openOptionsPage();
+        return;
+    }
+
     if (request.action === "retry_generation" && request.srcUrl && sender.tab) {
-        processImageGeneration(request.srcUrl, sender.tab.id, request.currentAlt || '');
+        processImageGeneration(request.srcUrl, sender.tab.id, request.currentAlt || '', request.pageContext || null);
         return;
     }
 

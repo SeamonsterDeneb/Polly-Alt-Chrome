@@ -123,16 +123,22 @@
 
 .polly-modal-fit-btn {
     position: absolute;
-    right: 15px;
+    right: 75px;
     top: 15px;
     background: #f0f0f0;
     border: 1px solid #ccc;
     color: #444;
     border-radius: 3px;
-    padding: 5px 12px;
+    padding: 4px 10px;
     font-size: 11px;
     font-weight: bold;
     cursor: pointer;
+    z-index: 2;
+}
+
+.polly-modal-fit-btn:hover {
+    background: #e4e4e4;
+    color: #111;
 }
 
 /* Persistent Draggable Audit Panel */
@@ -167,13 +173,38 @@
 
 .polly-panel-title { font-size: 14px; }
 
+.polly-panel-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
 .polly-panel-header-actions button {
-    background: transparent;
-    border: none;
-    color: #fff;
-    font-size: 16px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    color: #ffffff !important;
+    font-size: 14px;
     cursor: pointer;
-    margin-left: 8px;
+    padding: 3px 7px;
+    border-radius: 4px;
+    line-height: 1;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.polly-panel-header-actions button svg {
+    display: block;
+    width: 14px;
+    height: 14px;
+    stroke: #ffffff;
+}
+
+.polly-panel-header-actions button:hover {
+    background: rgba(255, 255, 255, 0.35);
+    border-color: #ffffff;
+    transform: scale(1.08);
 }
 
 #polly-panel-controls {
@@ -391,4 +422,17 @@
     font-family: inherit;
     box-sizing: border-box;
     resize: vertical;
+}
+
+/* Context Summary Banner inside Modal */
+.polly-context-badge {
+    background: #eef6fc;
+    border: 1px solid #c8e1f5;
+    border-left: 4px solid #2271b1;
+    color: #1d2327;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    margin-bottom: 16px;
+    line-height: 1.4;
 }
