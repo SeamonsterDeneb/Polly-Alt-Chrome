@@ -1,0 +1,394 @@
+#polly-alt-modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 9999999;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+#polly-alt-modal {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 0;
+    border-radius: 12px;
+    width: 80vw;
+    max-width: 800px;
+    max-height: 90vh;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+.polly-modal-image-container {
+    width: 100%;
+    background: #111;
+    display: block;
+    max-height: 35vh;
+    overflow-y: auto;
+    border-bottom: 1px solid #333;
+}
+
+.polly-modal-image-container img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.polly-modal-header {
+    padding: 18px 25px;
+    border-bottom: 1px solid #eee;
+    background: #fcfcfc;
+}
+
+.polly-modal-header h3 {
+    margin: 0;
+    color: #2271b1;
+    font-size: 18px;
+}
+
+.polly-modal-body {
+    padding: 25px;
+    overflow-y: auto;
+}
+
+.polly-tip-rotator {
+    margin: 16px 0; 
+    padding: 12px 14px; 
+    background: #f6faf0; 
+    border-left: 4px solid #96BE2D; 
+    border-radius: 4px; 
+    font-size: 13px; 
+    line-height: 1.5;
+}
+
+.polly-choice-item {
+    position: relative;
+    margin-bottom: 18px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #fcfcfc;
+}
+
+.polly-choice-select-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 18px;
+}
+
+.polly-choice-tag.polly-tag-ai {
+    color: #2271b1;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.polly-choice-content {
+    margin: 8px 0;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.polly-choice-char-count {
+    font-size: 11px;
+    font-weight: bold;
+    color: #999;
+}
+.over-limit { color: darkred; }
+
+.polly-choice-explanation {
+    margin-top: 12px;
+    padding: 12px 15px;
+    background: #f0f6fb;
+    border-radius: 6px;
+    border-left: 4px solid #2271b1;
+    font-size: 12px;
+    color: #444;
+    font-style: italic;
+}
+
+.polly-footer-btn {
+    width: 100%;
+    padding: 12px;
+    cursor: pointer;
+    border: 1px solid #ccc;
+    background: #f7f7f7;
+    border-radius: 6px;
+    font-weight: 600;
+    color: #555;
+}
+
+.polly-modal-fit-btn {
+    position: absolute;
+    right: 15px;
+    top: 15px;
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    color: #444;
+    border-radius: 3px;
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* Persistent Draggable Audit Panel */
+#polly-audit-panel {
+    position: fixed;
+    top: 30px;
+    right: 30px;
+    width: 380px;
+    max-height: 80vh;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    z-index: 9999998;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+    border: 1px solid #ddd;
+}
+
+#polly-panel-header {
+    background: #2271b1;
+    color: #ffffff;
+    padding: 12px 16px;
+    font-weight: bold;
+    cursor: move;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+}
+
+.polly-panel-title { font-size: 14px; }
+
+.polly-panel-header-actions button {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    margin-left: 8px;
+}
+
+#polly-panel-controls {
+    display: flex;
+    gap: 6px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #eee;
+}
+
+.polly-panel-btn {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid #ccc;
+    background: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.polly-panel-btn.primary { background: #2271b1; color: #fff; border-color: #2271b1; }
+.polly-panel-btn.danger { background: #fff8f8; color: #d63638; border-color: #d63638; }
+
+#polly-image-list {
+    overflow-y: auto;
+    padding: 10px;
+    flex: 1;
+}
+
+.polly-empty-notice {
+    text-align: center;
+    color: #666;
+    padding: 20px;
+    font-size: 13px;
+}
+
+.polly-image-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    background: #fff;
+}
+
+.polly-row-thumb {
+    width: 50px;
+    height: 50px;
+    background: #111;
+    border-radius: 4px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.polly-row-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.polly-row-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.polly-row-filename {
+    font-weight: bold;
+    font-size: 11px;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.polly-row-alt-display {
+    font-size: 12px;
+    color: #444;
+    margin: 4px 0;
+    line-height: 1.3;
+}
+
+.polly-row-alt-display.no-alt {
+    color: #d63638;
+}
+
+.polly-row-gen-btn {
+    background: #f6f7f7;
+    border: 1px solid #2271b1;
+    color: #2271b1;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 8px;
+    cursor: pointer;
+}
+
+.polly-row-check-wrap {
+    flex-shrink: 0;
+    padding-left: 5px;
+}
+
+.polly-row-checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+/* In-Panel Toast Notification (Pinned inside top of panel) */
+.polly-toast {
+    position: absolute;
+    top: 48px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    background: #1d2327;
+    color: #ffffff;
+    padding: 6px 14px;
+    border-radius: 14px;
+    font-size: 11px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    z-index: 10;
+    opacity: 0;
+    transition: all 0.2s ease;
+    border-left: 3px solid #96BE2D;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.polly-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Button Micro-interaction / Morph State */
+.polly-panel-btn {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid #ccc;
+    background: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.polly-panel-btn.btn-flash-success {
+    background: #96BE2D !important;
+    color: #ffffff !important;
+    border-color: #96BE2D !important;
+    transform: scale(1.04);
+}
+
+/* Polished Image Rows & Checkboxes */
+.polly-image-row {
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.polly-image-row.is-checked {
+    background-color: #f6faf0 !important;
+    border-color: #96BE2D !important;
+}
+
+.polly-row-checkbox {
+    width: 18px !important;
+    height: 18px !important;
+    cursor: pointer;
+    accent-color: #96BE2D;
+    border: 2px solid #2271b1 !important;
+    border-radius: 4px !important;
+    outline: none;
+    transition: all 0.15s ease;
+}
+
+.polly-row-checkbox:hover {
+    border-color: #135e96 !important;
+    transform: scale(1.05);
+}
+
+/* Modal Inline Edit Controls */
+.polly-modal-edit-btn {
+    position: absolute;
+    right: 15px;
+    top: 15px;
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    color: #444;
+    border-radius: 3px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    text-transform: uppercase;
+    z-index: 2;
+}
+
+.polly-modal-edit-btn:hover {
+    background: #e4e4e4;
+    color: #111;
+}
+
+.polly-choice-textarea {
+    width: 100%;
+    min-height: 70px;
+    font-size: 13px;
+    line-height: 1.4;
+    padding: 8px 10px;
+    border: 1px solid #2271b1;
+    border-radius: 4px;
+    margin: 8px 0;
+    background: #fff;
+    font-family: inherit;
+    box-sizing: border-box;
+    resize: vertical;
+}

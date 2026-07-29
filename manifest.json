@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Polly Alt - AI Alt Text Assistant",
+  "version": "1.0.0",
+  "description": "Like a parrot on a pirate's shoulder, Polly Alt tells your blind and low-vision users exactly what's on the horizon.",
+  "permissions": [
+    "contextMenus",
+    "storage",
+    "activeTab",
+    "downloads"
+  ],
+  "host_permissions": [
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_icon": "icons/icon48.png"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "css": ["content.css"],
+      "js": ["content.js"]
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Polly Alt Settings</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; color: #333; }
+        h1 { color: #2271b1; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        input[type="password"], input[type="number"], select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;}
+        .description { font-size: 12px; color: #666; margin-top: 5px; }
+        button { background: #2271b1; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🦜 Polly Alt Settings</h1>
+    
+    <div class="form-group">
+        <label>Gemini API Key</label>
+        <input type="password" id="api-key" placeholder="AIzaSy...">
+        <div class="description">Required to generate alt text. Get your free key at <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.</div>
+    </div>
+
+    <div class="form-group">
+        <label>AI Model</label>
+        <select id="model-select">
+            <option value="">— Enter API Key Above First —</option>
+        </select>
+        <div class="description">Models are dynamically fetched from your Gemini API account.</div>
+    </div>
+
+    <div class="form-group">
+        <label>Suggestions per Squawk</label>
+        <input type="number" id="choices" min="1" max="5" value="3">
+    </div>
+
+    <div class="form-group">
+        <label><input type="checkbox" id="explain"> Include educational explanations</label>
+    </div>
+
+    <button id="save-btn">Save Settings</button>
+
+    <script src="options.js"></script>
+</body>
+</html>
