@@ -69,11 +69,12 @@ async function processImageGeneration(srcUrl, tabId, currentAlt = '', pageContex
         let contextInstructions = '';
 
         if (pageContext?.isFunctional) {
-            contextInstructions = `FUNCTIONAL ROLE:\n` +
+            contextInstructions = `STRICT FUNCTIONAL LINK / BUTTON RULES:\n` +
                 `This image acts as an interactive ${pageContext.functionalRole.toUpperCase()} (Target: "${pageContext.destination}").\n` +
-                `- State ONLY the concise brand/organization name or action (e.g., "SeaMonster Studios Home").\n` +
-                `- NEVER write phrases like "acting as a link", "redirects to", "button icon", etc.\n` +
-                `- DO NOT describe visual emblem shapes unless strictly necessary for the action.\n\n`;
+                `- ULTRA-CONCISE MANDATE: Functional alt text MUST be as brief as possible (typically 2 to 5 words maximum).\n` +
+                `- State ONLY the brand or organization name and the primary destination/action (e.g., "SeaMonster Studios Home", "SeaMonster Studios Homepage", "SeaMonster Studios").\n` +
+                `- ABSOLUTE PROHIBITION ON MARKETING FLUFF: DO NOT add service descriptions, taglines, or explanatory descriptors (e.g. NEVER write "...for creative design and web development").\n` +
+                `- ABSOLUTE PROHIBITION ON META-EXPLANATIONS: NEVER write phrases like "acting as a link", "redirects to", "navigation button", "logo icon", etc.\n\n`;
         } else if (analyzedConcept) {
             contextInstructions = `STRICT EDITORIAL THEME (FROM SURROUNDING TEXT):\n` +
                 `"${analyzedConcept}"\n\n` +
