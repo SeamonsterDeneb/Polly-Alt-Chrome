@@ -65,8 +65,6 @@ function getFilenameFromUrl(url) {
 
 // Scrapes functional role and climbs parent wrappers to find preceding & following paragraph text
 function extractImageContext(imgSrc) {
-    console.log("🦜 POLLY SCRAPER: Searching DOM for image source:", imgSrc);
-
     const context = {
         isFunctional: false,
         functionalRole: '',
@@ -87,12 +85,7 @@ function extractImageContext(imgSrc) {
         });
     }
 
-    if (!imgEl) {
-        console.warn("🦜 POLLY SCRAPER: ❌ Could not match <img> tag in DOM for:", imgSrc);
-        return context;
-    }
-
-    console.log("🦜 POLLY SCRAPER: ✅ Found <img> element:", imgEl);
+    if (!imgEl) return context;
 
     // 2. Check Functional Roles (Link or Button wrapper)
     const linkParent = imgEl.closest('a');
@@ -102,13 +95,11 @@ function extractImageContext(imgSrc) {
         context.isFunctional = true;
         context.functionalRole = 'link';
         context.destination = linkParent.getAttribute('href') || linkParent.getAttribute('aria-label') || '';
-        console.log("🦜 POLLY SCRAPER: Image is a Link -> Destination:", context.destination);
         return context;
     } else if (buttonParent) {
         context.isFunctional = true;
         context.functionalRole = 'button';
         context.destination = buttonParent.getAttribute('aria-label') || buttonParent.getAttribute('title') || buttonParent.innerText.trim() || 'Trigger action';
-        console.log("🦜 POLLY SCRAPER: Image is a Button -> Action:", context.destination);
         return context;
     }
 
@@ -172,11 +163,11 @@ function extractImageContext(imgSrc) {
     context.paragraphsBefore = beforeTexts.slice(-2).join('\n\n');
     context.paragraphsAfter = afterTexts.slice(0, 1).join('\n\n');
 
-    console.log("🦜 POLLY SCRAPED PRECEDING PARAGRAPHS:\n", context.paragraphsBefore || "(None found)");
-    console.log("🦜 POLLY SCRAPED FOLLOWING PARAGRAPHS:\n", context.paragraphsAfter || "(None found)");
-
     return context;
 }
+// -------------------------------------------------------------------------
+// Persistent Draggable Panel
+// -------------------------------------------------------------------------
 function togglePollyPanel() {
     if (pollyPanel) {
         pollyPanel.style.display = (pollyPanel.style.display === 'none') ? 'flex' : 'none';
@@ -294,6 +285,7 @@ function refreshImageScanner() {
             row.classList.toggle('is-checked', checkbox.checked);
         });
 
+        // Connect "Preview & Generate" directly to the modal context
         // Connect "Preview & Generate" directly to the modal context
         row.querySelector('.polly-row-gen-btn').onclick = () => {
             activeRowTarget = row;

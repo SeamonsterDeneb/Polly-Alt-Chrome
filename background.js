@@ -46,10 +46,9 @@ async function processImageGeneration(srcUrl, tabId, currentAlt = '', pageContex
                 const pass1Data = await pass1Response.json();
                 if (pass1Response.ok && pass1Data.candidates?.[0]?.content?.parts?.[0]?.text) {
                     analyzedConcept = pass1Data.candidates[0].content.parts[0].text.trim();
-                    console.log("🦜 POLLY PASS 1 RESULT (TEXT ONLY):", analyzedConcept);
                 }
             } catch (e) {
-                console.warn("Polly Pass 1 Analysis Skipped:", e);
+                // Silent fallback if Pass 1 fails
             }
         }
 
@@ -118,6 +117,17 @@ async function processImageGeneration(srcUrl, tabId, currentAlt = '', pageContex
         const data = await aiResponse.json();
 
         if (!aiResponse.ok) {
+            const isQuotaError = aiResponse.status === 429 || 
+                                 (data.error?.message || '').toLowerCase().includes('quota') || 
+                                 (data.error?.message || '').includes('RESOURCE_EXHAUSTED');
+
+            if (isQuotaError) {
+                throw new Error(
+                    "Squawk! You've reached your free Gemini API rate limit or daily quota.\n\n" +
+                    "Tip: You can enable pay-as-you-go billing on your API key at Google AI Studio. " +
+                    "Gemini Flash is so inexpensive that auditing hundreds of images will only cost a few pennies!"
+                );
+            }
             throw new Error(data.error?.message || "Unknown Gemini API error");
         }
 
