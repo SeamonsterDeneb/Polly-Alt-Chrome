@@ -436,3 +436,84 @@
     margin-bottom: 16px;
     line-height: 1.4;
 }
+
+/* File: content.css */
+
+/* In-Panel View Containers */
+#polly-scanner-view,
+#polly-upload-view {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.polly-upload-container {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+}
+
+.polly-upload-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+}
+
+#polly-upload-context-input {
+    width: 100%;
+    height: 70px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 12px;
+    box-sizing: border-box;
+    resize: vertical;
+    font-family: inherit;
+}
+
+#polly-upload-context-input:focus {
+    border-color: #2271b1;
+    outline: none;
+}
+
+/* Panel Drop Zone */
+#polly-drop-zone {
+    border: 2px dashed #2271b1;
+    border-radius: 8px;
+    padding: 20px 10px;
+    text-align: center;
+    background: #f0f7fc;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#polly-drop-zone:hover,
+#polly-drop-zone.is-dragover {
+    background: #e1f0fa;
+    border-color: #135e96;
+}
+
+.polly-drop-icon {
+    font-size: 24px;
+    margin-bottom: 4px;
+}
+
+.polly-drop-title {
+    font-weight: bold;
+    color: #2271b1;
+    font-size: 13px;
+}
+
+.polly-drop-subtitle {
+    font-size: 11px;
+    color: #666;
+    margin-top: 2px;
+}
+
+#polly-upload-cancel-btn {
+    margin-top: 4px;
+}

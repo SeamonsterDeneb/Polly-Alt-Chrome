@@ -8,7 +8,9 @@ const ALT_TEXT_TIPS = [
 let pollyPanel = null;
 let pollyModalOverlay = null;
 let tipInterval = null;
-let activeRowTarget = null; // Tracks which image row initiated AI generation
+let activeRowTarget = null; // Tracks which on-page image row initiated AI generation
+let activeUploadInfo = null; // Tracks uploaded file metadata ({ filename, srcUrl })
+let pollyCapturedSelection = '';
 
 // -------------------------------------------------------------------------
 // Message Listener
@@ -168,7 +170,94 @@ function extractImageContext(imgSrc) {
 // -------------------------------------------------------------------------
 // Persistent Draggable Panel
 // -------------------------------------------------------------------------
+
+// Helper to completely tear down panel and free memory
+function closePollyPanel() {
+    dismissModal();
+    if (pollyPanel) {
+        pollyPanel.remove();
+        pollyPanel = null;
+    }
+}
+
+// Dedicated Upload Modal with Drag & Drop Zone and Context Input
+function showUploadView() {
+    const scannerView = document.getElementById('polly-scanner-view');
+    const uploadView = document.getElementById('polly-upload-view');
+    const contextInput = document.getElementById('polly-upload-context-input');
+
+    if (!scannerView || !uploadView) return;
+
+    // Grab fresh selection from page if available
+    const liveSelection = window.getSelection() ? window.getSelection().toString().trim() : '';
+    const initialContext = liveSelection || pollyCapturedSelection || '';
+
+    if (contextInput) {
+        contextInput.value = initialContext;
+    }
+
+    scannerView.style.display = 'none';
+    uploadView.style.display = 'flex';
+
+    if (initialContext && contextInput) {
+        contextInput.focus();
+        contextInput.select();
+    }
+}
+
+function showScannerView() {
+    const scannerView = document.getElementById('polly-scanner-view');
+    const uploadView = document.getElementById('polly-upload-view');
+
+    if (!scannerView || !uploadView) return;
+
+    uploadView.style.display = 'none';
+    scannerView.style.display = 'flex';
+}
+
+function processUploadedFile(file, contextText) {
+    if (!file) return;
+
+    // Track that this generation belongs to a newly uploaded image
+    activeRowTarget = null;
+    activeUploadInfo = {
+        filename: file.name || 'uploaded-image.jpg',
+        srcUrl: ''
+    };
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const dataUrl = event.target.result;
+        activeUploadInfo.srcUrl = dataUrl;
+
+        // Switch panel back to standard scanner view
+        showScannerView();
+
+        // Launch generation progress modal
+        buildModal(dataUrl);
+
+        const uploadContext = {
+            isFunctional: false,
+            paragraphsBefore: contextText ? `ARTICLE NARRATIVE CONTEXT:\n"${contextText}"` : '',
+            paragraphsAfter: ''
+        };
+
+        chrome.runtime.sendMessage({ 
+            action: "retry_generation", 
+            srcUrl: dataUrl,
+            currentAlt: '',
+            pageContext: uploadContext
+        });
+    };
+    reader.readAsDataURL(file);
+}
+
+
+
 function togglePollyPanel() {
+    // Capture any highlighted text BEFORE panel elements take focus
+    const sel = window.getSelection() ? window.getSelection().toString().trim() : '';
+    if (sel) pollyCapturedSelection = sel;
     if (pollyPanel) {
         pollyPanel.style.display = (pollyPanel.style.display === 'none') ? 'flex' : 'none';
         if (pollyPanel.style.display === 'flex') refreshImageScanner();
@@ -177,6 +266,7 @@ function togglePollyPanel() {
 
     pollyPanel = document.createElement('div');
     pollyPanel.id = 'polly-audit-panel';
+        // REPLACE THIS BLOCK:
     pollyPanel.innerHTML = `
         <div id="polly-panel-header">
             <span class="polly-panel-title">🦜 Polly Alt Assistant</span>
@@ -190,23 +280,82 @@ function togglePollyPanel() {
                 <button type="button" id="polly-panel-close-btn" aria-label="Close Panel">&times;</button>
             </div>
         </div>
-        <div id="polly-panel-controls">
-            <button type="button" class="polly-panel-btn primary" id="polly-add-checked-btn">➕ Add Checked to Queue</button>
-            <button type="button" class="polly-panel-btn" id="polly-export-btn">📥 Export (<span id="polly-queue-count">0</span>)</button>
-            <button type="button" class="polly-panel-btn danger" id="polly-clear-queue-btn">🗑️ Clear</button>
+
+        <!-- SCANNER VIEW -->
+        <div id="polly-scanner-view">
+            <div id="polly-panel-controls">
+                <button type="button" class="polly-panel-btn primary" id="polly-add-checked-btn">➕ Queue</button>
+                <button type="button" class="polly-panel-btn" id="polly-upload-btn">📤 Upload</button>
+                <button type="button" class="polly-panel-btn" id="polly-export-btn">📥 Export (<span id="polly-queue-count">0</span>)</button>
+                <button type="button" class="polly-panel-btn danger" id="polly-clear-queue-btn">🗑️ Clear</button>
+            </div>
+            <div id="polly-image-list"></div>
         </div>
-        <div id="polly-image-list"></div>
+
+        <!-- IN-PANEL UPLOAD VIEW -->
+        <div id="polly-upload-view" style="display: none;">
+            <div class="polly-upload-container">
+                <label class="polly-upload-label">
+                    Context Paragraph(s):
+                </label>
+                <textarea id="polly-upload-context-input" placeholder="Paste surrounding paragraph text here..."></textarea>
+
+                <div id="polly-drop-zone">
+                    <div class="polly-drop-icon">🖼️</div>
+                    <div class="polly-drop-title">Drag & Drop Image Here</div>
+                    <div class="polly-drop-subtitle">or click to browse local files</div>
+                    <input type="file" id="polly-panel-file-input" accept="image/*" style="display: none;">
+                </div>
+
+                <button type="button" class="polly-panel-btn" id="polly-upload-cancel-btn">Back to Image List</button>
+            </div>
+        </div>
     `;
+
 
     document.body.appendChild(pollyPanel);
     makeElementDraggable(pollyPanel, document.getElementById('polly-panel-header'));
 
-    // Control button handlers
-    document.getElementById('polly-panel-close-btn').onclick = () => pollyPanel.style.display = 'none';
+    // Global Header Action Handlers
+    document.getElementById('polly-panel-close-btn').onclick = closePollyPanel;
     document.getElementById('polly-panel-settings-btn').onclick = () => chrome.runtime.sendMessage({ action: "open_options" });
     document.getElementById('polly-clear-queue-btn').onclick = clearQueue;
     document.getElementById('polly-export-btn').onclick = exportQueue;
     document.getElementById('polly-add-checked-btn').onclick = addCheckedToQueue;
+
+    // View Switchers & Upload Handlers
+    document.getElementById('polly-upload-btn').onclick = showUploadView;
+    document.getElementById('polly-upload-cancel-btn').onclick = showScannerView;
+
+    const dropZone = document.getElementById('polly-drop-zone');
+    const fileInput = document.getElementById('polly-panel-file-input');
+    const contextInput = document.getElementById('polly-upload-context-input');
+
+    dropZone.onclick = () => fileInput.click();
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('is-dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('is-dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('is-dragover');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            processUploadedFile(e.dataTransfer.files[0], contextInput.value.trim());
+        }
+    });
+
+    fileInput.onchange = (e) => {
+        if (e.target.files && e.target.files[0]) {
+            processUploadedFile(e.target.files[0], contextInput.value.trim());
+        }
+    };
+
 
     updateQueueCountDisplay();
     refreshImageScanner();
@@ -235,9 +384,61 @@ function makeElementDraggable(panel, handle) {
     };
 }
 
+// Helper to prepend a newly uploaded image into the panel's audit list
+function addUploadedRowToPanel(src, filename, chosenAlt) {
+    const listContainer = document.getElementById('polly-image-list');
+    if (!listContainer) return;
+
+    // Remove "No visible images found" notice if present
+    const emptyNotice = listContainer.querySelector('.polly-empty-notice');
+    if (emptyNotice) emptyNotice.remove();
+
+    const row = document.createElement('div');
+    row.className = 'polly-image-row is-checked';
+    row.dataset.src = src;
+    row.dataset.filename = filename;
+
+    row.innerHTML = `
+        <div class="polly-row-thumb">
+            <img src="${src}" alt="">
+        </div>
+        <div class="polly-row-details">
+            <div class="polly-row-filename" title="${escapeHtml(filename)}">${escapeHtml(filename)} (Uploaded)</div>
+            <div class="polly-row-alt-display">
+                ${escapeHtml(chosenAlt)}
+            </div>
+            <button type="button" class="polly-row-gen-btn">✨ Preview & Generate</button>
+        </div>
+        <div class="polly-row-check-wrap">
+            <input type="checkbox" class="polly-row-checkbox" checked title="Select to queue for export">
+        </div>
+    `;
+
+    const checkbox = row.querySelector('.polly-row-checkbox');
+    checkbox.addEventListener('change', () => {
+        row.classList.toggle('is-checked', checkbox.checked);
+    });
+
+    row.querySelector('.polly-row-gen-btn').onclick = () => {
+        activeRowTarget = row;
+        activeUploadInfo = null;
+        const currentAltText = row.querySelector('.polly-row-alt-display').innerText.trim();
+        buildModal(src);
+        chrome.runtime.sendMessage({ 
+            action: "retry_generation", 
+            srcUrl: src,
+            currentAlt: currentAltText
+        });
+    };
+
+    listContainer.prepend(row);
+    showToast("📤 Added uploaded image to panel list!");
+}
+
 // -------------------------------------------------------------------------
 // On-Page Image Scanner & List Renderer
 // -------------------------------------------------------------------------
+
 function refreshImageScanner() {
     const listContainer = document.getElementById('polly-image-list');
     if (!listContainer) return;
@@ -589,6 +790,9 @@ function populateModal(choices, srcUrl, showExplanation, analysis = '', currentA
         const isOver = opt.alt.length > 125;
         let fitBtnHtml = isOver ? `<button type="button" class="polly-modal-fit-btn">Make it Fit</button>` : '';
 
+        const isUpload = !activeRowTarget && activeUploadInfo;
+        const applyBtnText = isUpload ? '✅ Select for Export' : '✅ Select & Apply';
+
         item.innerHTML = `
             <div class="polly-choice-select-btn">
                 <span class="polly-choice-tag polly-tag-ai">AI OPTION</span>
@@ -598,7 +802,7 @@ function populateModal(choices, srcUrl, showExplanation, analysis = '', currentA
             </div>
             ${fitBtnHtml}
             <div style="display:flex; gap:10px; padding: 0 18px 18px 18px;">
-                <button type="button" class="polly-footer-btn polly-select-apply-btn" style="background:#2271b1; color:#fff; border:none;">✅ Select & Apply</button>
+                <button type="button" class="polly-footer-btn polly-select-apply-btn" style="background:#2271b1; color:#fff; border:none;">${applyBtnText}</button>
                 <button type="button" class="polly-footer-btn polly-copy-btn">📋 Copy</button>
             </div>
         `;
@@ -640,9 +844,12 @@ function populateModal(choices, srcUrl, showExplanation, analysis = '', currentA
             showToast("📋 Copied to clipboard!");
         };
 
-        // Select & Apply Handler
+        // Select & Apply / Select for Export Handler
         item.querySelector('.polly-select-apply-btn').onclick = () => {
-            if (activeRowTarget && activeOptionText) {
+            if (isUpload) {
+                addUploadedRowToPanel(srcUrl, activeUploadInfo.filename, activeOptionText);
+                activeUploadInfo = null;
+            } else if (activeRowTarget && activeOptionText) {
                 const altDisplay = activeRowTarget.querySelector('.polly-row-alt-display');
                 altDisplay.innerText = activeOptionText;
                 altDisplay.classList.remove('no-alt');
@@ -655,6 +862,7 @@ function populateModal(choices, srcUrl, showExplanation, analysis = '', currentA
             }
             dismissModal();
         };
+
 
         body.appendChild(item);
     });

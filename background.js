@@ -55,16 +55,26 @@ async function processImageGeneration(srcUrl, tabId, currentAlt = '', pageContex
         // -----------------------------------------------------------------
         // PASS 2: Vision Alt Generation Grounded in Pass 1 Concept
         // -----------------------------------------------------------------
-        const imgResponse = await fetch(srcUrl);
-        const imgBlob = await imgResponse.blob();
-        const mimeType = imgBlob.type || 'image/jpeg';
-        
-        const base64Data = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result.split(',')[1]);
-            reader.onerror = () => reject(new Error("Failed to read image data"));
-            reader.readAsDataURL(imgBlob);
-        });
+        // Fetch the image and convert to Base64 (handles both HTTP URLs and uploaded Data URLs)
+        let mimeType = 'image/jpeg';
+        let base64Data = '';
+
+        if (srcUrl.startsWith('data:')) {
+            const parts = srcUrl.split(',');
+            mimeType = parts[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+            base64Data = parts[1];
+        } else {
+            const imgResponse = await fetch(srcUrl);
+            const imgBlob = await imgResponse.blob();
+            mimeType = imgBlob.type || 'image/jpeg';
+            
+            base64Data = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = () => reject(new Error("Failed to read image data"));
+                reader.readAsDataURL(imgBlob);
+            });
+        }
 
         let contextInstructions = '';
 
